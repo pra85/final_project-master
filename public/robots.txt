@@ -1,0 +1,16 @@
+# block all spiders by default
+User-agent: *
+Disallow: /
+
+# but allow major ones
+User-agent: Googlebot
+Allow: /
+
+User-agent: Slurp
+Allow: /
+
+User-Agent: msnbot
+Disallow: 
+
+User-agent: Baiduspider
+Disallow: /

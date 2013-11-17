@@ -1,0 +1,44 @@
+<div class="box wide">
+  <div class="legend">
+		Filtered Tags
+	</div>
+
+  <p>
+  To hide stories from the home page that have been tagged with certain tags,
+  check them below.
+  </p>
+
+  <% if !@user %>
+    <p>
+    Since you are not logged in, your filters will be stored in a long-lasting
+    browser cookie.  To permanently store your tag filters and have them work
+    across browsers, <a href="/login">login</a> to your account.
+    </p>
+  <% end %>
+
+  <%= form_tag "/filters", :method => :post do %>
+    <table class="data zebra" cellspacing=0 width="75%">
+    <tr>
+      <th width="7%">Hide</th>
+      <th width="15%">Tag</th>
+      <th width="78%">Description</th>
+    </tr>
+    <% Tag.order(:tag).accessible_to(@user).each do |tag| %>
+      <tr>
+        <td><input type="checkbox" name="tag_<%= tag.tag %>" value=1
+          <%= @filtered_tags.map{|ft| ft.tag_id }.include?(tag.id) ?
+          "checked" : "" %>></td>
+        <td><a href="/t/<%= tag.tag %>" class="<%= tag.css_class %>"><%=
+          tag.tag %></a></td>
+        <td><%= tag.description %>
+          <% if tag.filtered_by_default? %>
+            <em>(Filtered by default)</em>
+          <% end %></td>
+      </tr>
+    <% end %>
+    </table>
+    <p>
+    <%= submit_tag "Save Filters" %>
+    </p>
+  <% end %>
+</div>

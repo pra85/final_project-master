@@ -1,0 +1,1 @@
+Broomble::Application.config.secret_token = 'cbdafe93e10338b13e4ce432078811eb7a55a10a98ca0d35be1362c0f0d71d8aa83ff9d115357f32776c427a70977b62acef974fd847613de8e3f2edb9c1bedd'

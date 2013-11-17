@@ -1,0 +1,20 @@
+<% @comments.each do |comment| %>
+  <ol class="comments comments1">
+    <%= render :partial => "comments/comment", :locals => { :story =>
+      comment.story, :comment => comment,
+      :show_story => true } %>
+  </ol>
+<% end %>
+
+<div class="morelink">
+  <% if @page && @page > 1 %>
+    <a href="/comments<%= @page == 2 ? "" : "/page/#{@page - 1}" %>">&lt;&lt; 
+      Page <%= @page - 1 %></a>
+  <% end %>
+
+  <% if @page && @page > 1 %>
+    |
+  <% end %>
+
+  <a href="/comments/page/<%= @page + 1 %>">Page <%= @page + 1 %> &gt;&gt;</a>
+</div>

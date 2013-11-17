@@ -1,0 +1,324 @@
+//= require jquery
+//= require jquery_ujs
+//= require_tree .
+
+"use strict";
+
+var _Broomble = Class.extend({
+  curUser: null,
+
+  storyDownvoteReasons: { <%= Vote::STORY_REASONS.map{|k,v|
+      "#{k.inspect}: #{v.inspect}" }.join(", ") %> },
+  commentDownvoteReasons: { <%= Vote::COMMENT_REASONS.map{|k,v|
+      "#{k.inspect}: #{v.inspect}" }.join(", ") %> },
+
+  upvote: function(voterEl) {
+    Broomble.vote("story", voterEl, 1);
+  },
+  downvote: function(voterEl) {
+    Broomble._showDownvoteWhyAt("story", voterEl, function(k) {
+      Broomble.vote("story", voterEl, -1, k); });
+  },
+
+  upvoteComment: function(voterEl) {
+    Broomble.vote("comment", voterEl, 1);
+  },
+  downvoteComment: function(voterEl) {
+    Broomble._showDownvoteWhyAt("comment", voterEl, function(k) {
+      Broomble.vote("comment", voterEl, -1, k); });
+  },
+
+  _showDownvoteWhyAt: function(thingType, voterEl, onChooseWhy) {
+    if (!Broomble.curUser)
+      return Broomble.bounceToLogin();
+
+    var li = $(voterEl).parents("li").first();
+    if (li.hasClass("downvoted")) {
+      /* already upvoted, neutralize */
+      Broomble.vote(thingType, voterEl, -1, null);
+      return;
+    }
+
+    if ($("#downvote_why"))
+      $("#downvote_why").remove();
+    if ($("#downvote_why_shadow"))
+      $("#downvote_why_shadow").remove();
+
+    var sh = $("<div id=\"downvote_why_shadow\"></div>");
+    $(voterEl).after(sh);
+    sh.click(function() {
+      $("#downvote_why_shadow").remove();
+      $("#downvote_why").remove();
+    });
+
+    var d = $("<div id=\"downvote_why\"></div>");
+
+    var reasons;
+    if (thingType == "comment")
+      reasons = Broomble.commentDownvoteReasons;
+    else
+      reasons = Broomble.storyDownvoteReasons;
+
+    $.each(reasons, function(k, v) {
+      var a = $("<a href=\"#\"" + (k == "" ? " class=\"cancelreason\"" : "") +
+        ">" + v + "</a>");
+
+      a.click(function() {
+        $("#downvote_why").remove();
+        $("#downvote_why_shadow").remove();
+
+        if (k != "")
+          onChooseWhy(k);
+
+        return false;
+      });
+
+      d.append(a);
+    });
+
+    $(voterEl).after(d);
+
+    d.position({
+      my: "left top",
+      at: "left bottom",
+      offset: "-2 -2",
+      of: $(voterEl),
+      collision: "none",
+    });
+  },
+
+  vote: function(thingType, voterEl, point, reason) {
+    if (!Broomble.curUser)
+      return Broomble.bounceToLogin();
+
+    var li = $(voterEl).parents("li").first();
+    var scoreDiv = li.find("div.score").get(0);
+    var score = parseInt(scoreDiv.innerHTML);
+    var action = "";
+
+    if (li.hasClass("upvoted") && point > 0) {
+      /* already upvoted, neutralize */
+      li.removeClass("upvoted");
+      score--;
+      action = "unvote";
+    }
+    else if (li.hasClass("downvoted") && point < 0) {
+      /* already downvoted, neutralize */
+      li.removeClass("downvoted");
+      score++;
+      action = "unvote";
+    }
+    else if (point > 0) {
+      if (li.hasClass("downvoted"))
+        /* flip flop */
+        score++;
+
+      li.removeClass("downvoted").addClass("upvoted");
+      score++;
+      action = "upvote";
+    }
+    else if (point < 0) {
+      if (li.hasClass("upvoted"))
+        /* flip flop */
+        score--;
+
+      li.removeClass("upvoted").addClass("downvoted");
+      score--;
+      action = "downvote";
+    }
+
+    scoreDiv.innerHTML = score;
+
+    if (action == "upvote" || action == "unvote")
+      li.find(".reason").html("");
+    else if (action == "downvote" && thingType == "comment")
+      li.find(".reason").html("(" +
+        Broomble.commentDownvoteReasons[reason].toLowerCase() + ")");
+
+    $.post("/" + (thingType == "story" ? "stories" : thingType + "s") + "/" +
+      $(voterEl).parents("li").first().attr("data-shortid") + "/" +
+      action, { reason: reason });
+  },
+
+  postComment: function(form) {
+    $(form).parent().load($(form).attr("action"), $(form).serializeArray());
+  },
+
+  previewComment: function(form) {
+    $(form).parent().load($(form).attr("action").replace(/(post|update)/,
+      "preview"), $(form).serializeArray());
+  },
+  
+  previewStory: function(form) {
+    $("#inside").load("/stories/preview", $(form).serializeArray());
+  },
+
+  moderateStory: function(link) {
+    var reason = prompt("Moderation reason:");
+    if (reason == null || reason == "")
+      return false;
+
+    var link = $(link);
+
+    /* $.rails.handleMethod() */
+    var href = $.rails.href(link),
+      method = link.data('method'),
+      target = link.attr('target'),
+      csrf_token = $("meta[name=csrf-token]").attr("content"),
+      csrf_param = $("meta[name=csrf-param]").attr("content"),
+      form = $("<form method=\"post\" action=\"" + href + "\"></form>"),
+      metadata_input = "<input name=\"_method\" value=\"" + method +
+        "\" type=\"hidden\" />";
+
+    if (csrf_param !== undefined && csrf_token !== undefined)
+      metadata_input += "<input name=\"" + csrf_param + "\" value=\"" +
+        csrf_token + "\" type=\"hidden\" />";
+
+    if (target)
+      form.attr("target", target);
+
+    var r = $("<input type=\"hidden\" name=\"reason\" />");
+    r.val(reason);
+    form.append(r);
+
+    form.hide().append(metadata_input).appendTo('body');
+    form.submit();
+
+    return false;
+  },
+
+  fetchURLTitle: function(button, url_field, title_field) {
+    if (url_field.val() == "")
+      return;
+
+    var old_value = button.val();
+    button.prop("disabled", true);
+    button.val("Fetching...");
+
+    $.post("/stories/fetch_url_title", {
+      fetch_url: url_field.val(),
+    })
+    .success(function(data) {
+      if (data && data.title)
+        title_field.val(data.title.substr(0,
+          title_field.maxLength));
+
+      button.val(old_value);
+      button.prop("disabled", false);
+    })
+    .error(function() {
+      button.val(old_value);
+      button.prop("disabled", false);
+    });
+  },
+
+  bounceToLogin: function() {
+    document.location = "/login?return=" +
+      encodeURIComponent(document.location);
+  },
+});
+
+var Broomble = new _Broomble();
+
+$(document).ready(function() {
+  $("li.comment a.downvoter").click(function() {
+    Broomble.downvoteComment(this);
+    return false;
+  });
+  $("li.comment a.upvoter").click(function() {
+    Broomble.upvoteComment(this);
+    return false;
+  });
+
+  $("li.story a.downvoter").click(function() {
+    Broomble.downvote(this);
+    return false;
+  });
+  $("li.story a.upvoter").click(function() {
+    Broomble.upvote(this);
+    return false;
+  });
+
+  $("li.story a.mod_story_link").click(function() {
+    return Broomble.moderateStory(this);
+  }),
+
+  $("a.comment_replier").on("click", function() {
+    if (!Broomble.curUser) {
+      Broomble.bounceToLogin();
+      return false;
+    }
+
+    var box = $(this).parents("li.comment").first().find("div.comment_reply").
+      first();
+
+    box.html($("#comment_form").clone());
+    box.find("ol").remove();
+
+    box.find("button.comment-preview").after("&nbsp;\n&nbsp;<button class=\"comment-cancel\" name=\"button\" type=\"button\">Cancel</button>");
+
+    box.find("textarea").focus();
+
+    var el = $("<input type=\"hidden\" " +
+      "name=\"parent_comment_short_id\" value=\"" +
+      $(this).parents("li.comment").first().attr("data-shortid") + "\">");
+
+    box.find("form").append(el);
+
+    return false;
+  });
+
+  $("button.comment-cancel").on("click", function() {
+    $(this).parents("div.comment_reply form").remove();
+  });
+
+  $("a.comment_editor").on("click", function() {
+    var li = $(this).parents("li.comment").first();
+    li.load("/comments/" + $(li).attr("data-shortid") + "/edit",
+      { "edit": 1 });
+  });
+
+  $("a.comment_deletor").on("click", function() {
+    if (confirm("Are you sure you want to delete this comment?")) {
+      var li = $(this).parents("li.comment").first();
+      $.post("/comments/" + $(li).attr("data-shortid") + "/delete",
+      function(d) {
+        $(li).replaceWith(d);
+      });
+    }
+  });
+
+  $("a.comment_undeletor").on("click", function() {
+    if (confirm("Are you sure you want to undelete this comment?")) {
+      var li = $(this).parents("li.comment").first();
+      $.post("/comments/" + $(li).attr("data-shortid") + "/undelete",
+      function(d) {
+        $(li).replaceWith(d);
+      });
+    }
+  });
+
+  $("#story_tags_a").select2({
+    formatSelection: function(what) {
+      return what.id;
+    },
+    matcher: function(term, text) {
+      return text.toUpperCase().indexOf(term.toUpperCase()) == 0;
+    }
+  });
+
+  /* TODO: jquery says on() is slow and bad, what is supposed to be used? */
+  $("div.markdown_help_toggler .markdown_help_label").on("click",
+  function() {
+    $(this).parents("div.markdown_help_toggler").first().
+      children(".markdown_help").toggle();
+  });
+
+  $("button.comment-post").on("click", function() {
+    Broomble.postComment($(this).parents("form").first());
+  });
+
+  $("button.comment-preview").on("click", function() {
+    Broomble.previewComment($(this).parents("form").first());
+  });
+});

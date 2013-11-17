@@ -1,0 +1,39 @@
+<ol class="stories">
+	<%= render :partial => "stories/listdetail",
+    :locals => { :story => @story, :single_story => true } %>
+</ol>
+
+<div class="story_content">
+	<% if @story.markeddown_description.present? %>
+		<div class="story_text">
+			<%= raw @story.markeddown_description %>
+		</div>
+	<% end %>
+
+  <p></p>
+  <% if @user && !@story.is_gone? && !@story.previewing %>
+    <%= render :partial => "comments/commentbox",
+      :locals => { :story => @story, :comment => @comment } %>
+  <% end %>
+</div>
+
+<% if @comments %>
+  <% indent_level = -1 %>
+  <% @comments.each_with_index do |comment,x| %>
+    <% if comment.indent_level > indent_level %>
+      <ol class="comments comments<%= comment.indent_level %>">
+    <% elsif comment.indent_level < indent_level %>
+      <% (indent_level - comment.indent_level).times do %>
+        </ol>
+      <% end %>
+    <% end %>
+
+    <%= render :partial => "comments/comment", :locals => { :story => @story,
+      :comment => comment } %>
+
+    <% indent_level = comment.indent_level %>
+  <% end %>
+  <% indent_level.times do %>
+    </ol>
+  <% end %>
+<% end %>

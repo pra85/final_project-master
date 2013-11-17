@@ -1,0 +1,86 @@
+<li id="comment_<%= comment.short_id %>" data-shortid="<%= comment.short_id %>"
+class="comment <%= comment.current_vote ? (comment.current_vote[:vote] == 1 ?
+"upvoted" : "downvoted") : "" %>
+  <%= comment.highlighted ? "highlighted" : "" %>
+	<%= comment.score <= 0 ? "negative" : "" %>
+	<%= comment.score <= -3 ? "negative_3" : "" %>
+	<%= comment.score <= -5 ? "negative_5" : "" %>
+	<%= comment.score <= -7 ? "negative_7" : "" %>">
+  <% if !comment.is_gone? %>
+    <div class="voters">
+      <a class="upvoter"></a>
+      <div class="score">
+        <%= comment.score %>
+      </div>
+      <a class="downvoter"></a>
+    </div>
+  <% end %>
+	<div class="details">
+		<div class="byline">
+      <% if comment.previewing %>
+        <a><%= comment.user.username %></a>
+        previewed
+        just now
+      <% else %>
+        <a href="/u/<%= comment.user.username %>"><%= comment.user.username
+          %></a>
+
+        <%= comment.has_been_edited?? "edited" : "" %>
+        <%= raw(time_ago_in_words_label(comment.has_been_edited? ?
+          comment.updated_at : comment.created_at).gsub(/^about /, "")) %> ago
+      <% end %>
+
+      <% if !comment.previewing %>
+        |
+        <a href="<%= story.comments_url %>/comments/<%= comment.short_id
+          %>">link</a>
+
+        <% if comment.is_editable_by_user?(@user) %>
+          |
+          <a class="comment_editor">edit</a>
+        <% end %>
+
+        <% if comment.is_gone? && comment.is_undeletable_by_user?(@user) %>
+          |
+          <a class="comment_undeletor">undelete</a>
+        <% elsif !comment.is_gone? && comment.is_deletable_by_user?(@user) %>
+          |
+          <a class="comment_deletor">delete</a>
+        <% end %>
+
+        <% if !story.is_gone? && !comment.is_gone? &&
+        !(defined?(show_story) && show_story) %>
+            |
+            <a class="comment_replier">reply</a>
+        <% end %>
+
+        <span class="reason">
+          <% if comment.downvotes > 0 && comment.user_id == @user.try(:id) %>
+            | <%= comment.vote_summary.downcase %>
+          <% elsif comment.current_vote && comment.current_vote[:vote] == -1 %>
+            | <%= Vote::COMMENT_REASONS[comment.current_vote[:reason]].downcase
+              %>
+          <% end %>
+        </span>
+      <% end %>
+
+      <% if defined?(show_story) && show_story %>
+        | on:
+        <a href="<%= story.comments_url %>"><%= story.title %></a>
+      <% end %>
+		</div>
+		<div class="comment_text">
+      <% if comment.is_gone? %>
+        <p>
+        <span class="na">
+        [<%= comment.gone_text %>]
+        </span>
+        </p>
+      <% else %>
+        <%= raw comment.markeddown_comment %>
+      <% end %>
+		</div>
+
+    <div class="comment_reply"></div>
+	</div>
+</li>
